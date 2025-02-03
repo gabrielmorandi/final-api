@@ -1,0 +1,10 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "siacmica-llm"
+main = "src/index.ts"
+compatibility_date = "2025-01-09"
+routes = [{ pattern = "ia.siacmica.com", custom_domain = true }]
+
+
+[observability]
+enabled = true
+
