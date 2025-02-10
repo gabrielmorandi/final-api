@@ -294,7 +294,7 @@ app.post("/specialties", async (c) => {
             .bind(customer_id, name, description)
             .run();
 
-        return c.json({ result, customer_id, name, description });
+        return c.json({ id: result.meta.last_row_id, customer_id, name, description });
     } catch (err) {
         return c.json({ error: err }, 400);
     }
