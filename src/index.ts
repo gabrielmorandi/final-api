@@ -338,10 +338,7 @@ app.post("/doctors", async (c) => {
             .bind(user_id, customer_id, crm, specialty_id)
             .run();
 
-        return c.json({
-            doctor: { id: doctorResult.meta.lastInsertRowid, user_id, customer_id, crm, specialty_id },
-            user: { id: user_id, customer_id, email, name, role: "doctor" }
-        });
+        return c.json({ id: doctorResult.meta.lastInsertRowid, user_id, customer_id, crm, specialty_id });
     } catch (err) {
         return c.json({ error: err }, 400);
     }
