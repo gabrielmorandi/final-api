@@ -315,35 +315,49 @@ app.get("/specialties", async (c) => {
 app.post("/doctors", async (c) => {
     try {
         const validatedData = doctorSchema.parse(await c.req.json());
+        console.log("Dados validados:", validatedData);
 
         const { customer_id, email, name, password, crm, specialty_id } = validatedData;
         const password_hash = await bcrypt.hash(password, 10);
 
+        console.log("Valores do bind para USERS:", customer_id, email, name, password_hash);
+
+        // Criando usuário
         const userResult = await c.env.DB.prepare(
-            `
-            INSERT INTO users (customer_id, email, name, password_hash, role)
-            VALUES (?, ?, ?, ?, 'doctor')
-            `
+            `INSERT INTO users (customer_id, email, name, password_hash, role) 
+            VALUES (?, ?, ?, ?, 'doctor')`
         )
             .bind(customer_id, email, name, password_hash)
             .run();
 
-        const user_id = userResult.meta.lastInsertRowid as number;
+        console.log("User Insert Result:", userResult);
 
+        if (!userResult.meta.lastInsertRowid) {
+            throw new Error("Erro ao criar usuário: lastInsertRowid não retornado.");
+        }
+
+        const user_id = userResult.meta.lastInsertRowid;
+        console.log("User ID gerado:", user_id);
+
+        console.log("Valores do bind para DOCTORS:", user_id, customer_id, crm, specialty_id);
+
+        // Criando médico
         const doctorResult = await c.env.DB.prepare(
-            `
-            INSERT INTO doctors (user_id, customer_id, crm, specialty_id)
-            VALUES (?, ?, ?, ?)
-            `
+            `INSERT INTO doctors (user_id, customer_id, crm, specialty_id) 
+            VALUES (?, ?, ?, ?)`
         )
             .bind(user_id, customer_id, crm, specialty_id)
             .run();
 
+        console.log("Doctor Insert Result:", doctorResult);
+
         return c.json({ id: doctorResult.meta.lastInsertRowid, user_id, customer_id, crm, specialty_id });
-    } catch (err: any) {
-        return c.json({ error: err.message }, 400);
+    } catch (err) {
+        console.error(err);
+        return c.json({ error: err instanceof Error ? err.message : JSON.stringify(err) }, 400);
     }
 });
+
 // Listar médicos
 app.get("/doctors", async (c) => {
     const results = await c.env.DB.prepare(
