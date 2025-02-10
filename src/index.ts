@@ -384,14 +384,4 @@ app.get("/doctors", async (c) => {
     return c.json(results.results);
 });
 
-
-// Criando rotas CRUD para cada entidade
-// createCrudRoutes("customers", "customers", customerSchema);
-// createCrudRoutes("users", "users", userSchema);
-// createCrudRoutes("specialties", "specialties", specialtySchema);
-// createCrudRoutes("doctors", "doctors", doctorSchema);
-// createCrudRoutes("patients", "patients", patientSchema);
-// createCrudRoutes("appointments", "appointments", appointmentSchema);
-// createCrudRoutes("slots", "available_slots", slotSchema);
-
 export default app;
