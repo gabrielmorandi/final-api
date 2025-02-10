@@ -239,89 +239,79 @@ app.get("/me", async (c) => {
     });
 });
 
-// Rotas CRUD Genéricas
-const createCrudRoutes = (path: string, table: string, schema: z.ZodSchema) => {
-    // Create
-    app.post(`/${path}`, async (c) => {
-        const payload = c.get("jwtPayload");
-        const body = await c.req.json();
-        const data = schema.parse({ ...body, customer_id: payload.customerId });
+app.post("/customers", async (c) => {
+    const payload = c.get("jwtPayload");
+    const body = await c.req.json();
+    const data = customerSchema.parse({ ...body, customer_id: payload.customerId });
 
-        const columns = Object.keys(data).join(", ");
-        const values = Object.values(data);
-        const placeholders = values.map(() => "?").join(", ");
+    const columns = Object.keys(data).join(", ");
+    const values = Object.values(data);
+    const placeholders = values.map(() => "?").join(", ");
 
-        const result = await c.env.DB.prepare(`INSERT INTO ${table} (${columns}) VALUES (${placeholders}) RETURNING *`)
-            .bind(...values)
-            .first();
+    const result = await c.env.DB.prepare(`INSERT INTO customers (${columns}) VALUES (${placeholders}) RETURNING *`)
+        .bind(...values)
+        .first();
 
-        return c.json(result);
-    });
+    return c.json(result);
+});
 
-    // Read All
-    app.get(`/${path}`, async (c) => {
-        const payload = c.get("jwtPayload");
-        const results = await c.env.DB.prepare(`SELECT * FROM ${table} WHERE customer_id = ?`)
-            .bind(payload.customerId)
-            .all();
+app.get("/customers", async (c) => {
+    const payload = c.get("jwtPayload");
+    const results = await c.env.DB.prepare(`SELECT * FROM customers WHERE customer_id = ?`)
+        .bind(payload.customerId)
+        .all();
 
-        return c.json(results);
-    });
+    return c.json(results);
+});
 
-    // Read One
-    app.get(`/${path}/:id`, async (c) => {
-        const payload = c.get("jwtPayload");
-        const id = c.req.param("id");
-        const result = await c.env.DB.prepare(`SELECT * FROM ${table} WHERE id = ? AND customer_id = ?`)
-            .bind(id, payload.customerId)
-            .first();
+app.get("/customers/:id", async (c) => {
+    const payload = c.get("jwtPayload");
+    const id = c.req.param("id");
+    const result = await c.env.DB.prepare(`SELECT * FROM customers WHERE id = ? AND customer_id = ?`)
+        .bind(id, payload.customerId)
+        .first();
 
-        return result ? c.json(result) : c.json({ error: "Not found" }, 404);
-    });
+    return result ? c.json(result) : c.json({ error: "Not found" }, 404);
+});
 
-    // Update
-    app.put(`/${path}/:id`, async (c) => {
-        const payload = c.get("jwtPayload");
-        const id = c.req.param("id");
-        const body = await c.req.json();
-        const data = schema.parse(body);
+app.put("/customers/:id", async (c) => {
+    const payload = c.get("jwtPayload");
+    const id = c.req.param("id");
+    const body = await c.req.json();
+    const data = customerSchema.parse(body);
 
-        const updates = Object.entries(data)
-            .filter(([_, value]) => value !== undefined)
-            .map(([key]) => `${key} = ?`)
-            .join(", ");
+    const updates = Object.entries(data)
+        .filter(([_, value]) => value !== undefined)
+        .map(([key]) => `${key} = ?`)
+        .join(", ");
 
-        const values = Object.values(data);
+    const values = Object.values(data);
 
-        const result = await c.env.DB.prepare(
-            `UPDATE ${table} SET ${updates} WHERE id = ? AND customer_id = ? RETURNING *`
-        )
-            .bind(...values, id, payload.customerId)
-            .first();
+    const result = await c.env.DB.prepare(
+        `UPDATE customers SET ${updates} WHERE id = ? AND customer_id = ? RETURNING *`
+    )
+        .bind(...values, id, payload.customerId)
+        .first();
 
-        return result ? c.json(result) : c.json({ error: "Not found" }, 404);
-    });
+    return result ? c.json(result) : c.json({ error: "Not found" }, 404);
+});
 
-    // Delete
-    app.delete(`/${path}/:id`, async (c) => {
-        const payload = c.get("jwtPayload");
-        const id = c.req.param("id");
+app.delete("/customers/:id", async (c) => {
+    const payload = c.get("jwtPayload");
+    const id = c.req.param("id");
 
-        await c.env.DB.prepare(`DELETE FROM ${table} WHERE id = ? AND customer_id = ?`)
-            .bind(id, payload.customerId)
-            .run();
+    await c.env.DB.prepare(`DELETE FROM customers WHERE id = ? AND customer_id = ?`).bind(id, payload.customerId).run();
 
-        return c.json({ success: true });
-    });
-};
+    return c.json({ success: true });
+});
 
 // Criando rotas CRUD para cada entidade
-createCrudRoutes("customers", "customers", customerSchema);
-createCrudRoutes("users", "users", userSchema);
-createCrudRoutes("specialties", "specialties", specialtySchema);
-createCrudRoutes("doctors", "doctors", doctorSchema);
-createCrudRoutes("patients", "patients", patientSchema);
-createCrudRoutes("appointments", "appointments", appointmentSchema);
-createCrudRoutes("slots", "available_slots", slotSchema);
+// createCrudRoutes("customers", "customers", customerSchema);
+// createCrudRoutes("users", "users", userSchema);
+// createCrudRoutes("specialties", "specialties", specialtySchema);
+// createCrudRoutes("doctors", "doctors", doctorSchema);
+// createCrudRoutes("patients", "patients", patientSchema);
+// createCrudRoutes("appointments", "appointments", appointmentSchema);
+// createCrudRoutes("slots", "available_slots", slotSchema);
 
 export default app;
