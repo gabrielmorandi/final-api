@@ -379,7 +379,9 @@ app.get("/doctors", async (c) => {
         JOIN users ON doctors.user_id = users.id
         WHERE doctors.customer_id = ?
         `
-    ).bind(payload.customer_id).all();
+    )
+        .bind(payload.customer_id)
+        .all();
 
     return c.json(results.results);
 });
