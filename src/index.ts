@@ -42,8 +42,10 @@ const specialtySchema = z.object({
 });
 
 const doctorSchema = z.object({
-    user_id: z.number(),
     customer_id: z.number(),
+    email: z.string().email(),
+    name: z.string().min(2),
+    password: z.string().min(6),
     crm: z.string().min(5),
     specialty_id: z.number()
 });
@@ -314,8 +316,21 @@ app.post("/doctors", async (c) => {
     try {
         const validatedData = doctorSchema.parse(await c.req.json());
 
-        const { user_id, customer_id, crm, specialty_id } = validatedData;
-        const result = await c.env.DB.prepare(
+        const { customer_id, email, name, password, crm, specialty_id } = validatedData;
+        const password_hash = await bcrypt.hash(password, 10);
+
+        const userResult = await c.env.DB.prepare(
+            `
+            INSERT INTO users (customer_id, email, name, password_hash, role)
+            VALUES (?, ?, ?, ?, 'doctor')
+            `
+        )
+            .bind(customer_id, email, name, password_hash)
+            .run();
+
+        const user_id = userResult.meta.lastInsertRowid;
+
+        const doctorResult = await c.env.DB.prepare(
             `
             INSERT INTO doctors (user_id, customer_id, crm, specialty_id)
             VALUES (?, ?, ?, ?)
@@ -324,12 +339,14 @@ app.post("/doctors", async (c) => {
             .bind(user_id, customer_id, crm, specialty_id)
             .run();
 
-        return c.json({ id: result.meta.last_row_id, user_id, customer_id, crm, specialty_id });
+        return c.json({
+            doctor: { id: doctorResult.meta.lastInsertRowid, user_id, customer_id, crm, specialty_id },
+            user: { id: user_id, customer_id, email, name, role: "doctor" }
+        });
     } catch (err) {
         return c.json({ error: err }, 400);
     }
 });
-
 // Listar médicos
 app.get("/doctors", async (c) => {
     const results = await c.env.DB.prepare(
