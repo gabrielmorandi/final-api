@@ -267,7 +267,7 @@ app.get("/customers", async (c) => {
 
     const results = await c.env.DB.prepare(`SELECT * FROM customers WHERE customer_id = ?`)
         .bind(payload.customerId)
-        .all();
+        .first();
 
     return c.json(results);
 });
