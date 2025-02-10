@@ -2,9 +2,11 @@
 name = "siacmica-llm"
 main = "src/index.ts"
 compatibility_date = "2025-01-09"
-routes = [{ pattern = "ia.siacmica.com", custom_domain = true }]
-
 
 [observability]
 enabled = true
 
+[[d1_databases]]
+binding = "DB"
+database_name = "final-db"
+database_id = "7cdaf787-f22a-448d-8f20-757cf3c2e6d0"
