@@ -264,16 +264,6 @@ app.get("/customers", async (c) => {
     return c.json(results);
 });
 
-app.get("/customers/:id", async (c) => {
-    const payload = c.get("jwtPayload");
-    const id = c.req.param("id");
-    const result = await c.env.DB.prepare(`SELECT * FROM customers WHERE id = ? AND customer_id = ?`)
-        .bind(id, payload.customerId)
-        .first();
-
-    return result ? c.json(result) : c.json({ error: "Not found" }, 404);
-});
-
 app.put("/customers/:id", async (c) => {
     const payload = c.get("jwtPayload");
     const id = c.req.param("id");
