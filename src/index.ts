@@ -240,22 +240,6 @@ app.get("/me", async (c) => {
     });
 });
 
-app.post("/customers", async (c) => {
-    const payload = c.get("jwtPayload");
-    const body = await c.req.json();
-    const data = customerSchema.parse({ ...body, customer_id: payload.customerId });
-
-    const columns = Object.keys(data).join(", ");
-    const values = Object.values(data);
-    const placeholders = values.map(() => "?").join(", ");
-
-    const result = await c.env.DB.prepare(`INSERT INTO customers (${columns}) VALUES (${placeholders}) RETURNING *`)
-        .bind(...values)
-        .first();
-
-    return c.json(result);
-});
-
 app.get("/customers", async (c) => {
     const payload = c.get("jwtPayload");
 
