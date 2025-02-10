@@ -259,15 +259,7 @@ app.post("/customers", async (c) => {
 app.get("/customers", async (c) => {
     const payload = c.get("jwtPayload");
 
-    console.log("JWT Payload:", payload);
-
-    if (!payload || !payload.customerId) {
-        return c.json({ error: "Missing customerId in JWT" }, 401);
-    }
-
-    const results = await c.env.DB.prepare(`SELECT * FROM customers WHERE id = ?`)
-        .bind(payload.customerId)
-        .first();
+    const results = await c.env.DB.prepare(`SELECT * FROM customers WHERE id = ?`).bind(payload.customerId).first();
 
     return c.json(results);
 });
