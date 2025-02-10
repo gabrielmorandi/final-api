@@ -83,6 +83,7 @@ const secret =
 
 app.use("/me", jwt({ secret }));
 app.use("/customers", jwt({ secret }));
+app.use("/doctors", jwt({ secret }));
 
 app.post("/signup", async (c) => {
     try {
@@ -277,6 +278,36 @@ app.delete("/customers/:id", async (c) => {
     await c.env.DB.prepare(`DELETE FROM customers WHERE id = ? AND customer_id = ?`).bind(id, payload.customerId).run();
 
     return c.json({ success: true });
+});
+
+app.post("/specialties", async (c) => {
+    try {
+        const validatedData = specialtySchema.parse(await c.req.json());
+
+        const { customer_id, name, description } = validatedData;
+        const result = await c.env.DB.prepare(
+            `
+        INSERT INTO specialties (customer_id, name, description)
+        VALUES (?, ?, ?)
+        `
+        )
+            .bind(customer_id, name, description)
+            .run();
+
+        return c.json({ result, customer_id, name, description });
+    } catch (err) {
+        return c.json({ error: err }, 400);
+    }
+});
+
+app.get("/specialties", async (c) => {
+    const results = await c.env.DB.prepare(
+        `
+      SELECT id, customer_id, name, description FROM specialties
+      `
+    ).all();
+
+    return c.json(results);
 });
 
 // Criando rotas CRUD para cada entidade
