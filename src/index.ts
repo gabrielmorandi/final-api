@@ -340,8 +340,8 @@ app.post("/doctors", async (c) => {
             .run();
 
         return c.json({ id: doctorResult.meta.lastInsertRowid, user_id, customer_id, crm, specialty_id });
-    } catch (err) {
-        return c.json({ error: err }, 400);
+    } catch (err: any) {
+        return c.json({ error: err.message }, 400);
     }
 });
 // Listar médicos
