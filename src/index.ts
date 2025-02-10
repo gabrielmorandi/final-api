@@ -211,84 +211,32 @@ app.post("/login", async (c) => {
     }
 });
 
-app.get("/dashboard", async (c) => {
-    try {
-        const payload = c.get("jwtPayload");
+app.get("/me", async (c) => {
+    const payload = c.get("jwtPayload");
 
-        const user = await c.env.DB.prepare(
-            `
-          SELECT id, customer_id, email, name, role
-          FROM users
-          WHERE id = ?
+    const user = await c.env.DB.prepare(
         `
-        )
-            .bind(payload.userId)
-            .first();
-    
-        if (!user) {
-            return c.json({ error: "Usuário não encontrado" }, 404);
-        }
+      SELECT id, customer_id, email, name, role
+      FROM users
+      WHERE id = ?
+    `
+    )
+        .bind(payload.userId)
+        .first();
 
-        // Buscar dados do cliente
-        const customer = await c.env.DB.prepare("SELECT id, name, email, phone FROM customers WHERE id = ?")
-            .bind(user.customerId)
-            .first();
-
-        // Buscar médicos
-        const doctors = await c.env.DB.prepare(
-            `
-            SELECT d.id, d.crm, d.name AS doctor_name, s.name AS specialty_name
-            FROM doctors d
-            JOIN specialties s ON d.specialty_id = s.id
-            WHERE d.customer_id = ?
-            `
-        )
-            .bind(payload.customerId)
-            .all();
-
-        // Buscar pacientes
-        const patients = await c.env.DB.prepare(
-            "SELECT id, name, date_of_birth, gender FROM patients WHERE customer_id = ?"
-        )
-            .bind(payload.customerId)
-            .all();
-
-        // Buscar agendamentos
-        const appointments = await c.env.DB.prepare(
-            `
-            SELECT a.id, a.status, p.name AS patient_name, d.name AS doctor_name, a.created_at
-            FROM appointments a
-            JOIN patients p ON a.patient_id = p.id
-            JOIN doctors d ON a.doctor_id = d.id
-            WHERE a.customer_id = ?
-            `
-        )
-            .bind(payload.customerId)
-            .all();
-
-        // Buscar horários disponíveis
-        const availableSlots = await c.env.DB.prepare(
-            `
-        SELECT s.start_time, s.end_time, d.name AS doctor_name
-        FROM available_slots s
-        JOIN doctors d ON s.doctor_id = d.id
-        WHERE s.customer_id = ? AND s.is_available = 1
-        `
-        )
-            .bind(payload.customerId)
-            .all();
-
-        return c.json({
-            customer,
-            doctors,
-            patients,
-            appointments,
-            availableSlots
-        });
-    } catch (error) {
-        console.error("Erro ao carregar o dashboard:", error);
-        return c.json({ error: "Erro ao carregar o dashboard" }, 500);
+    if (!user) {
+        return c.json({ error: "Usuário não encontrado" }, 404);
     }
+
+    return c.json({
+        user: {
+            id: user.id,
+            customerId: user.customer_id,
+            email: user.email,
+            name: user.name,
+            role: user.role
+        }
+    });
 });
 
 // Rotas CRUD Genéricas
