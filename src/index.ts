@@ -98,7 +98,6 @@ app.post("/signup", async (c) => {
             return c.json({ error: "Email já cadastrado" }, 400);
         }
 
-        // Inserir customer e obter ID
         const customerResult = await c.env.DB.prepare(
             "INSERT INTO customers (name, email, phone) VALUES (?, ?, ?) RETURNING id"
         )
@@ -111,10 +110,8 @@ app.post("/signup", async (c) => {
 
         const customerId = customerResult.id;
 
-        // Hash da senha
         const passwordHash = await bcrypt.hash(data.password, 10);
 
-        // Criar usuário admin
         const userResult = await c.env.DB.prepare(
             `
                 INSERT INTO users (customer_id, email, name, password_hash, role)
@@ -129,7 +126,6 @@ app.post("/signup", async (c) => {
             throw new Error("Falha ao criar usuário");
         }
 
-        // Gerar token JWT com o secret consistente
         const token = await sign(
             {
                 userId: userResult.id,
@@ -370,20 +366,29 @@ app.post("/doctors", async (c) => {
 });
 
 app.get("/doctors", async (c) => {
-    const payload = c.get("jwtPayload");
+    try {
+        const payload = c.get("jwtPayload");
+        const customerId = payload?.customerId;
+        if (!customerId) {
+            return c.json({ error: "Customer ID não encontrado no payload" }, 400);
+        }
 
-    const results = await c.env.DB.prepare(
-        `
-        SELECT doctors.id, doctors.user_id, doctors.customer_id, doctors.crm, doctors.specialty_id, users.name AS user_name, users.email AS user_email
-        FROM doctors
-        JOIN users ON doctors.user_id = users.id
-        WHERE doctors.customer_id = ?
-        `
-    )
-        .bind(payload.customer_id)
-        .all();
+        const results = await c.env.DB.prepare(
+            `
+            SELECT doctors.id, doctors.user_id, doctors.customer_id, doctors.crm, doctors.specialty_id, users.name AS user_name, users.email AS user_email
+            FROM doctors
+            JOIN users ON doctors.user_id = users.id
+            WHERE doctors.customer_id = ?
+            `
+        )
+            .bind(customerId)
+            .all();
 
-    return c.json(results.results);
+        return c.json(results.results);
+    } catch (error) {
+        console.error("Erro interno:", error);
+        return c.json({ error: "Erro interno no servidor" }, 500);
+    }
 });
 
 export default app;
