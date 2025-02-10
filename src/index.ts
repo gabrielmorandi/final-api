@@ -256,12 +256,26 @@ app.post("/customers", async (c) => {
 });
 
 app.get("/customers", async (c) => {
+    // Acessa o JWT Payload, onde deve ter o customerId
     const payload = c.get("jwtPayload");
-    const results = await c.env.DB.prepare(`SELECT * FROM customers WHERE customer_id = ?`)
-        .bind(payload.customerId)
-        .all();
 
-    return c.json(results);
+    // Verifica se o payload e o customerId existem
+    if (!payload || !payload.customerId) {
+        return c.json({ error: "Unauthorized, missing customerId in JWT" }, 401);
+    }
+
+    try {
+        // Busca os dados no banco usando o customerId
+        const results = await c.env.DB.prepare(`SELECT * FROM customers WHERE customer_id = ?`)
+            .bind(payload.customerId) // Usando customerId do JWT Payload
+            .all();
+
+        // Retorna os resultados
+        return c.json(results);
+    } catch (error) {
+        // Caso ocorra algum erro
+        return c.json({ error: "Internal Server Error", details: error.message }, 500);
+    }
 });
 
 app.get("/customers/:id", async (c) => {
