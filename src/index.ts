@@ -370,13 +370,16 @@ app.post("/doctors", async (c) => {
 });
 
 app.get("/doctors", async (c) => {
+    const payload = c.get("jwtPayload");
+
     const results = await c.env.DB.prepare(
         `
         SELECT doctors.id, doctors.user_id, doctors.customer_id, doctors.crm, doctors.specialty_id, users.name AS user_name, users.email AS user_email
         FROM doctors
         JOIN users ON doctors.user_id = users.id
+        WHERE doctors.customer_id = ?
         `
-    ).all();
+    ).bind(payload.customer_id).all();
 
     return c.json(results.results);
 });
