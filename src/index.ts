@@ -287,9 +287,9 @@ app.post("/specialties", async (c) => {
         const { customer_id, name, description } = validatedData;
         const result = await c.env.DB.prepare(
             `
-        INSERT INTO specialties (customer_id, name, description)
-        VALUES (?, ?, ?)
-        `
+            INSERT INTO specialties (customer_id, name, description)
+            VALUES (?, ?, ?)
+            `
         )
             .bind(customer_id, name, description)
             .run();
@@ -305,6 +305,37 @@ app.get("/specialties", async (c) => {
         `
       SELECT id, customer_id, name, description FROM specialties
       `
+    ).all();
+
+    return c.json(results.results);
+});
+
+app.post("/doctors", async (c) => {
+    try {
+        const validatedData = doctorSchema.parse(await c.req.json());
+
+        const { user_id, customer_id, crm, specialty_id } = validatedData;
+        const result = await c.env.DB.prepare(
+            `
+            INSERT INTO doctors (user_id, customer_id, crm, specialty_id)
+            VALUES (?, ?, ?, ?)
+            `
+        )
+            .bind(user_id, customer_id, crm, specialty_id)
+            .run();
+
+        return c.json({ id: result.meta.last_row_id, user_id, customer_id, crm, specialty_id });
+    } catch (err) {
+        return c.json({ error: err }, 400);
+    }
+});
+
+// Listar médicos
+app.get("/doctors", async (c) => {
+    const results = await c.env.DB.prepare(
+        `
+        SELECT id, user_id, customer_id, crm, specialty_id FROM doctors
+        `
     ).all();
 
     return c.json(results.results);
