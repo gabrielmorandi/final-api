@@ -1,8 +1,12 @@
 import { Hono } from "hono";
-import { jwt } from "hono/jwt";
+import { jwt, sign } from "hono/jwt";
 import { cors } from "hono/cors";
 import { z } from "zod";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
+
+type CloudflareBindings = {
+    DB: D1Database;
+};
 
 const signupSchema = z.object({
     companyName: z.string().min(2),
@@ -17,106 +21,101 @@ const loginSchema = z.object({
     password: z.string()
 });
 
-// Criação da aplicação Hono
-const app = new Hono<{ Bindings: Bindings }>();
+const app = new Hono<{ Bindings: CloudflareBindings }>();
 
-// Middleware de CORS
 app.use("/*", cors());
 
-// Middleware de autenticação JWT
-const auth = jwt({
-    secret: (c) => c.env.JWT_SECRET
-});
+const secret =
+    "Trabalho-Final-Banco-de-Dados-II-Desenvolvimento-de-uma-solução-SaaS-para-facilitar-o-agendamento-de-consultas-médicas";
 
-// Rota de cadastro
+app.use("/me", jwt({ secret }));
+
 app.post("/signup", async (c) => {
     try {
         const body = await c.req.json();
         const data = signupSchema.parse(body);
 
-        // Verifica se o email já existe
         const existingUser = await c.env.DB.prepare("SELECT id FROM users WHERE email = ?").bind(data.email).first();
 
         if (existingUser) {
             return c.json({ error: "Email já cadastrado" }, 400);
         }
 
-        // Inicia transação
-        const queries = [];
+        // Inserir customer e obter ID
+        const customerResult = await c.env.DB.prepare(
+            "INSERT INTO customers (name, email, phone) VALUES (?, ?, ?) RETURNING id"
+        )
+            .bind(data.companyName, data.email, data.phone)
+            .first();
 
-        // Cria novo customer
-        queries.push(
-            c.env.DB.prepare("INSERT INTO customers (name, email, phone) VALUES (?, ?, ?)").bind(
-                data.companyName,
-                data.email,
-                data.phone
-            )
-        );
+        if (!customerResult) {
+            throw new Error("Falha ao criar customer");
+        }
 
-        // Obtém o ID do customer inserido
-        queries.push(c.env.DB.prepare("SELECT last_insert_rowid() as id"));
-
-        // Executa transação para criar customer
-        const results = await c.env.DB.batch(queries);
-        const customerId = results[1].results[0].id;
+        const customerId = customerResult.id;
 
         // Hash da senha
         const passwordHash = await bcrypt.hash(data.password, 10);
 
-        // Cria usuário admin
-        await c.env.DB.prepare(
+        // Criar usuário admin
+        const userResult = await c.env.DB.prepare(
             `
-        INSERT INTO users (customer_id, email, name, password_hash, role)
-        VALUES (?, ?, ?, ?, 'admin')
-      `
+                INSERT INTO users (customer_id, email, name, password_hash, role)
+                VALUES (?, ?, ?, ?, 'admin')
+                RETURNING id, customer_id, email, name, role
+            `
         )
             .bind(customerId, data.email, data.adminName, passwordHash)
-            .run();
+            .first();
 
-        // Gera token JWT
-        const token = await jwt.sign(
+        if (!userResult) {
+            throw new Error("Falha ao criar usuário");
+        }
+
+        // Gerar token JWT com o secret consistente
+        const token = await sign(
             {
-                customerId,
+                userId: userResult.id,
+                customerId: userResult.customer_id,
                 email: data.email,
                 role: "admin"
             },
-            c.env.JWT_SECRET
+            secret
         );
 
         return c.json(
             {
                 token,
                 user: {
-                    customerId,
-                    email: data.email,
-                    name: data.adminName,
-                    role: "admin"
+                    id: userResult.id,
+                    customerId: userResult.customer_id,
+                    email: userResult.email,
+                    name: userResult.name,
+                    role: userResult.role
                 }
             },
             201
         );
     } catch (error) {
+        console.error("Erro no signup:", error);
         if (error instanceof z.ZodError) {
             return c.json({ error: "Dados inválidos", details: error.errors }, 400);
         }
-        console.error("Erro no signup:", error);
         return c.json({ error: "Erro interno do servidor" }, 500);
     }
 });
 
-// Rota de login
 app.post("/login", async (c) => {
     try {
         const body = await c.req.json();
         const data = loginSchema.parse(body);
 
-        // Busca usuário
         const user = await c.env.DB.prepare(
             `
-        SELECT u.id, u.customer_id, u.email, u.name, u.password_hash, u.role
-        FROM users u
-        WHERE u.email = ?
-      `
+                SELECT id, customer_id, email, name, password_hash, role
+                FROM users
+                WHERE email = ?
+            `
         )
             .bind(data.email)
             .first();
@@ -125,21 +124,19 @@ app.post("/login", async (c) => {
             return c.json({ error: "Credenciais inválidas" }, 401);
         }
 
-        // Verifica senha
-        const validPassword = await bcrypt.compare(data.password, user.password_hash);
+        const validPassword = await bcrypt.compare(data.password, user.password_hash as string);
         if (!validPassword) {
             return c.json({ error: "Credenciais inválidas" }, 401);
         }
 
-        // Gera token JWT
-        const token = await jwt.sign(
+        const token = await sign(
             {
-                customerId: user.customer_id,
                 userId: user.id,
+                customerId: user.customer_id,
                 email: user.email,
                 role: user.role
             },
-            c.env.JWT_SECRET
+            secret
         );
 
         return c.json({
@@ -153,41 +150,45 @@ app.post("/login", async (c) => {
             }
         });
     } catch (error) {
+        console.error("Erro no login:", error);
         if (error instanceof z.ZodError) {
             return c.json({ error: "Dados inválidos", details: error.errors }, 400);
         }
-        console.error("Erro no login:", error);
         return c.json({ error: "Erro interno do servidor" }, 500);
     }
 });
 
-// Rota protegida para verificar autenticação
-app.get("/me", auth, async (c) => {
+app.get("/me", async (c) => {
     const payload = c.get("jwtPayload");
 
-    const user = await c.env.DB.prepare(
-        `
-      SELECT id, customer_id, email, name, role
-      FROM users
-      WHERE id = ?
-    `
-    )
-        .bind(payload.userId)
-        .first();
+    try {
+        const user = await c.env.DB.prepare(
+            `
+                SELECT id, customer_id, email, name, role
+                FROM users
+                WHERE id = ?
+            `
+        )
+            .bind(payload.userId)
+            .first();
 
-    if (!user) {
-        return c.json({ error: "Usuário não encontrado" }, 404);
-    }
-
-    return c.json({
-        user: {
-            id: user.id,
-            customerId: user.customer_id,
-            email: user.email,
-            name: user.name,
-            role: user.role
+        if (!user) {
+            return c.json({ error: "Usuário não encontrado" }, 404);
         }
-    });
+
+        return c.json({
+            user: {
+                id: user.id,
+                customerId: user.customer_id,
+                email: user.email,
+                name: user.name,
+                role: user.role
+            }
+        });
+    } catch (error) {
+        console.error("Erro ao buscar usuário:", error);
+        return c.json({ error: "Erro interno do servidor" }, 500);
+    }
 });
 
 export default app;
