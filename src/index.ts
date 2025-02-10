@@ -82,6 +82,7 @@ const secret =
     "Trabalho-Final-Banco-de-Dados-II-Desenvolvimento-de-uma-solução-SaaS-para-facilitar-o-agendamento-de-consultas-médicas";
 
 app.use("/me", jwt({ secret }));
+app.use("/customers", jwt({ secret }));
 
 app.post("/signup", async (c) => {
     try {
