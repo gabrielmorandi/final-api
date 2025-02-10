@@ -85,7 +85,6 @@ const secret =
 
 app.use("/me", jwt({ secret }));
 app.use("/customers", jwt({ secret }));
-app.use("/doctors", jwt({ secret }));
 
 app.post("/signup", async (c) => {
     try {
