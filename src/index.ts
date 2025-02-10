@@ -320,45 +320,55 @@ app.post("/doctors", async (c) => {
         const { customer_id, email, name, password, crm, specialty_id } = validatedData;
         const password_hash = await bcrypt.hash(password, 10);
 
-        console.log("Valores do bind para USERS:", customer_id, email, name, password_hash);
-
-        // Criando usuário
         const userResult = await c.env.DB.prepare(
             `INSERT INTO users (customer_id, email, name, password_hash, role) 
-            VALUES (?, ?, ?, ?, 'doctor')`
+             VALUES (?, ?, ?, ?, 'doctor')
+             RETURNING id`
         )
             .bind(customer_id, email, name, password_hash)
-            .run();
+            .first();
 
         console.log("User Insert Result:", userResult);
 
-        if (!userResult.meta.lastInsertRowid) {
-            throw new Error("Erro ao criar usuário: lastInsertRowid não retornado.");
+        if (!userResult?.id) {
+            throw new Error("Falha ao obter o ID do usuário criado");
         }
 
-        const user_id = userResult.meta.lastInsertRowid;
+        const user_id = userResult.id;
         console.log("User ID gerado:", user_id);
 
-        console.log("Valores do bind para DOCTORS:", user_id, customer_id, crm, specialty_id);
+        if (!crm || !specialty_id) {
+            throw new Error("CRM ou especialidade inválidos");
+        }
 
-        // Criando médico
         const doctorResult = await c.env.DB.prepare(
             `INSERT INTO doctors (user_id, customer_id, crm, specialty_id) 
-            VALUES (?, ?, ?, ?)`
+             VALUES (?, ?, ?, ?)`
         )
             .bind(user_id, customer_id, crm, specialty_id)
             .run();
 
         console.log("Doctor Insert Result:", doctorResult);
 
-        return c.json({ id: doctorResult.meta.lastInsertRowid, user_id, customer_id, crm, specialty_id });
+        return c.json({
+            id: doctorResult.meta.lastInsertRowid,
+            user_id,
+            customer_id,
+            crm,
+            specialty_id
+        });
     } catch (err) {
-        console.error(err);
-        return c.json({ error: err instanceof Error ? err.message : JSON.stringify(err) }, 400);
+        console.error("Erro detalhado:", err);
+        return c.json(
+            {
+                error: err instanceof Error ? err.message : "Erro desconhecido",
+                details: err instanceof Error ? undefined : err
+            },
+            500
+        );
     }
 });
 
-// Listar médicos
 app.get("/doctors", async (c) => {
     const results = await c.env.DB.prepare(
         `
