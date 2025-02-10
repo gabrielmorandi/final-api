@@ -328,7 +328,7 @@ app.post("/doctors", async (c) => {
             .bind(customer_id, email, name, password_hash)
             .run();
 
-        const user_id = userResult.meta.lastInsertRowid;
+        const user_id = userResult.meta.lastInsertRowid as number;
 
         const doctorResult = await c.env.DB.prepare(
             `
