@@ -307,7 +307,7 @@ app.get("/specialties", async (c) => {
       `
     ).all();
 
-    return c.json(results);
+    return c.json(results.results);
 });
 
 // Criando rotas CRUD para cada entidade
