@@ -215,9 +215,23 @@ app.get("/dashboard", async (c) => {
     try {
         const payload = c.get("jwtPayload");
 
+        const user = await c.env.DB.prepare(
+            `
+          SELECT id, customer_id, email, name, role
+          FROM users
+          WHERE id = ?
+        `
+        )
+            .bind(payload.userId)
+            .first();
+    
+        if (!user) {
+            return c.json({ error: "Usuário não encontrado" }, 404);
+        }
+
         // Buscar dados do cliente
         const customer = await c.env.DB.prepare("SELECT id, name, email, phone FROM customers WHERE id = ?")
-            .bind(payload.customerId)
+            .bind(user.customerId)
             .first();
 
         // Buscar médicos
